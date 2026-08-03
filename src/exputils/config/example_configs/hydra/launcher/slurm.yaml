@@ -1,0 +1,27 @@
+# @package hydra.launcher
+_target_: hydra_plugins.hydra_submitit_launcher.submitit_launcher.SlurmLauncher
+
+partition: my_partition        # CHANGE ME
+timeout_min: 720
+submitit_folder: ${hydra.sweep.dir}/submitit/${group}/%j
+name: ${group}
+gres: gpu:1
+mem_per_cpu: 3000
+signal_delay_s: 120
+max_num_timeout: 3
+stderr_to_stdout: true
+array_parallelism: 256
+
+additional_parameters:
+  ntasks: 3
+  cpus-per-task: 4
+  requeue: true
+
+# Set to null to use submitit defaults
+qos: null
+comment: null
+constraint: null
+cpus_per_gpu: null
+gpus_per_task: null
+mem_per_gpu: null
+setup: null

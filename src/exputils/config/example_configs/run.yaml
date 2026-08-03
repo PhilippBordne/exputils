@@ -1,0 +1,26 @@
+# Standard run config.
+# Usage: python train.py --config-name run
+#
+# Uncomment alternatives as needed.
+
+defaults:
+  - my_config           # structured config registered in ConfigStore
+  - paths               # directory structure
+  # - override hydra/launcher: slurm     # uncomment for cluster
+  - _self_
+
+wandb_project: a_random_project
+group: my_experiment
+log_to_wandb: false
+
+# --- Seed ---
+# Local / single task:
+seed: 0
+# Multi-task SLURM (ntasks > 1), each task gets seed = base + SLURM_PROCID:
+# seed: ${slurm_seed:0}
+
+# --- Results path ---
+# Local:
+# path_results: results
+# Cluster:
+# path_results: /work/my_cluster_path/results

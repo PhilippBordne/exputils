@@ -1,0 +1,13 @@
+# Paths config — defines directory structure for experiment outputs.
+# Include this via Hydra defaults in your run config.
+#
+# Adapt the dir template to your project's hyperparameters.
+# Fields in the path must uniquely identify the experiment config.
+
+run_name: ${gen_run_name:${train.method_a},${train.method_b}}
+
+hydra:
+  run:
+    dir: ${path_results}/${group}/${run_name}/lr:${train.lr}/${seed}
+  sweep:
+    dir: ${path_results}/${group}/${run_name}/lr:${train.lr}/${seed}

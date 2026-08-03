@@ -1,0 +1,40 @@
+# HPO sweep config.
+# Usage: python train.py --config-name sweep_hpo --multirun
+#
+# Uses ${hydra.job.override_dirname} to create unique directories
+# from swept parameters (e.g. "train.lr=0.001,train.batch_size=128").
+# No need to manually add every swept HP to the path template.
+
+defaults:
+  - my_config
+  - paths
+  - override hydra/launcher: slurm
+  - _self_
+
+wandb_project: a_random_project
+group: hpo_example
+seed: ${slurm_seed:0}
+log_to_wandb: false
+path_results: /work/my_cluster_path/results
+
+hydra:
+  sweep:
+    dir: ${path_results}/${group}/${run_name}/${hydra.job.override_dirname}/${seed}
+  job:
+    config:
+      override_dirname:
+        exclude_keys:
+          - group
+          - seed
+          - log_to_wandb
+          - path_results
+
+  launcher:
+    additional_parameters:
+      ntasks: 5
+      cpus-per-task: 2
+
+  sweeper:
+    params:
+      train.lr: 1e-4,3e-4,1e-3
+      train.batch_size: 128,256
