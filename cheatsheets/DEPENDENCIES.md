@@ -13,8 +13,8 @@ dependencies = [
 
 # specify dependencies to be resolved from local paths/submodules
 [tool.uv.sources]
-sbx      = { path = "external/sbx",      editable = true }
-exputils = { path = "external/exputils", editable = true }
+sbx      = { path = "externals/sbx",      editable = true }
+exputils = { path = "externals/exputils", editable = true }
 
 [build-system]
 requires = ["hatchling"]

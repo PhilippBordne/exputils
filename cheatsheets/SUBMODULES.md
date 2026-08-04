@@ -1,7 +1,7 @@
 ## Working with submodules
 ```bash
 ### Adding
-git submodule add <url> external/<name>      # add a submodule at a given path
+git submodule add <url> externals/<name>      # add a submodule at a given path
 git submodule add -b <branch> <url> <path>   # track a specific branch
 
 ### Cloning a repo that has submodules
@@ -13,10 +13,10 @@ git submodule update --remote <path>         # fetch + check out latest from tra
 git submodule update --init --recursive      # check out the commits currently pinned by the parent repo
 
 ### Pinning a new commit (inside the submodule)
-cd external/<name>
+cd externals/<name>
 git checkout <commit-or-branch>              # move submodule to desired commit
 cd ../..
-git add external/<name>                      # stage the new pin in the parent repo
+git add externals/<name>                      # stage the new pin in the parent repo
 git commit -m "Bump <name> to <commit>"      # record it
 
 ### Inspection
