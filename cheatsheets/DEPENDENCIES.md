@@ -5,7 +5,7 @@ name = "myproject"
 version = "0.1.0"
 requires-python = ">=3.11"
 dependencies = [
-    "sbx",
+    "sbx-rl",
     "exputils",
     "numpy",
     "jax",
@@ -13,7 +13,7 @@ dependencies = [
 
 # specify dependencies to be resolved from local paths/submodules
 [tool.uv.sources]
-sbx      = { path = "externals/sbx",      editable = true }
+sbx-rl      = { path = "externals/sbx",      editable = true }
 exputils = { path = "externals/exputils", editable = true }
 
 [build-system]
