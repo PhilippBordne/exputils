@@ -58,6 +58,7 @@ from my_project.configuration import MyConfig
 # Seed with SLURM task offset: ${slurm_seed:0} resolves to 0 + SLURM_PROCID.
 # Use in cluster configs to give each SLURM task a unique seed.
 # Locally (no SLURM_PROCID), it's a no-op.
+# NOTE THIS ONLY WORKS IF THE RESOLVER RUNS PER TASK (i.e. if launched by batch script / does not work if done through hydra's submitit)
 OmegaConf.register_new_resolver(
     "slurm_seed",
     lambda base: int(base) + int(os.environ.get("SLURM_PROCID", 0)),

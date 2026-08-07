@@ -1,2 +1,86 @@
 uv.lock
 
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+*.egg
+.eggs/
+pip-wheel-metadata/
+
+# ---- Virtual environments ----
+.venv/
+venv/
+env/
+.env
+.python-version
+
+# ---- Package / dependency managers ----
+.uv/
+poetry.lock       # keep if you want reproducible locks; remove line otherwise
+.pdm-python
+
+# ---- Testing / linting / typing ----
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+
+# ---- Jupyter ----
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# ---- ML / experiment tracking ----
+wandb/
+mlruns/
+lightning_logs/
+runs/                 # tensorboard
+outputs/              # hydra default output dir
+multirun/             # hydra multirun
+.hydra/
+
+# ---- Checkpoints / artifacts / data ----
+*.ckpt
+*.pt
+*.pth
+*.pkl
+*.h5
+*.npy
+*.npz
+checkpoints/
+data/                 # remove if you version small datasets
+datasets/
+logs/
+*.log
+
+# ---- Config secrets ----
+*.secret
+secrets.yaml
+.envrc
+
+# ---- Editors / IDEs ----
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ---- OS ----
+.DS_Store
+Thumbs.db
+
+# ---- LaTeX (if paper drafts live in-repo) ----
+*.aux
+*.bbl
+*.blg
+*.out
+*.toc
+*.synctex.gz
+
