@@ -1,8 +1,8 @@
-"""Episode-based evaluation callback for SBX / SB3 off-policy algorithms.
+"""Evaluation callback for SBX / SB3 algorithms.
 
-Evaluates the agent on one or more environments at a fixed episode interval,
-matching the ``log_interval`` semantics of off-policy algorithms (which count
-episodes, not timesteps).
+For off-policy algorithms, evaluates at a fixed episode interval matching the
+``log_interval`` semantics (which count episodes, not timesteps).
+For on-policy algorithms, evaluates at the end of every ``eval_freq`` rollouts.
 """
 
 from __future__ import annotations
@@ -82,6 +82,7 @@ class EvalCallback(BaseCallback):
         self.deterministic = deterministic
         self.q_val_max_samples = q_val_max_samples
         self._last_eval_episode = 0
+        self._rollout_count = 0
 
     def _eval_qf_state(self, qf_state, obs, actions):
         """Forward pass through a single critic, returns (n_samples,) Q-values."""
@@ -98,7 +99,14 @@ class EvalCallback(BaseCallback):
         # TQC-style single critic: (n_samples, n_quantiles) → mean over quantiles
         return q_out.mean(axis=-1)
 
+    @property
+    def _is_off_policy(self) -> bool:
+        return hasattr(self.model, "replay_buffer")
+
     def _log_q_values(self) -> None:
+        if not self._is_off_policy:
+            return
+
         replay_buffer = self.model.replay_buffer
         if replay_buffer is None or replay_buffer.size() == 0:
             return
@@ -122,15 +130,7 @@ class EvalCallback(BaseCallback):
         self.logger.record("eval/q_value_p99", float(np.percentile(q_values, 99)))
         self.logger.record("eval/q_value_mean", float(np.mean(q_values)))
 
-    def _on_step(self) -> bool:
-        episode_num = self.model._episode_num  # type: ignore[attr-defined]
-
-        if episode_num == self._last_eval_episode:
-            return True
-        if episode_num % self.eval_freq != 0:
-            return True
-
-        self._last_eval_episode = episode_num
+    def _run_eval(self) -> None:
         gamma = self.model.gamma
 
         for log_key, env in self.eval_envs.items():
@@ -149,14 +149,37 @@ class EvalCallback(BaseCallback):
 
             if self.verbose >= 1:
                 print(
-                    f"[Eval episode {episode_num}] {log_key}: "
+                    f"[Eval step {self.num_timesteps}] {log_key}: "
                     f"mean_return={np.mean(ep_returns):.2f} +/- {np.std(ep_returns):.2f}, "
                     f"mean_discounted_return={np.mean(ep_disc_returns):.2f}"
                 )
 
         self._log_q_values()
         self.logger.dump(step=self.num_timesteps)
+
+    def _on_step(self) -> bool:
+        if not self._is_off_policy:
+            return True  # On-policy evaluates in _on_rollout_end
+
+        episode_num = self.model._episode_num  # type: ignore[attr-defined]
+
+        if episode_num == self._last_eval_episode:
+            return True
+        if episode_num % self.eval_freq != 0:
+            return True
+
+        self._last_eval_episode = episode_num
+        self._run_eval()
         return True
+
+    def _on_rollout_end(self) -> None:
+        if self._is_off_policy:
+            return  # Off-policy evaluates in _on_step
+
+        self._rollout_count += 1
+        if self._rollout_count % self.eval_freq != 0:
+            return
+        self._run_eval()
 
     def _on_training_end(self) -> None:
         for env in self.eval_envs.values():
