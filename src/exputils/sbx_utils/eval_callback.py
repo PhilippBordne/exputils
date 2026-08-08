@@ -8,6 +8,7 @@ episodes, not timesteps).
 from __future__ import annotations
 
 import gymnasium as gym
+import jax
 import numpy as np
 from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.evaluation import evaluate_policy
@@ -16,18 +17,22 @@ from stable_baselines3.common.evaluation import evaluate_policy
 class EvalCallback(BaseCallback):
     """Evaluate the current policy on multiple environments every *N* episodes.
 
+    Also logs the 90th-percentile of Q-values estimated on a sample from the
+    replay buffer (capped at ``q_val_max_samples`` to limit overhead).
+
     Parameters
     ----------
     eval_envs : dict[str, gym.Env]
-        Mapping from a logger key (e.g. ``"eval/return_noisy"``) to the
-        gymnasium environment used for that evaluation.
+        Mapping from a logger key (e.g. ``"eval/clean"``) to the gymnasium
+        environment used for that evaluation.
     eval_freq : int
-        Run evaluation every ``eval_freq`` training episodes.  Uses the same
-        episode counter as the off-policy ``log_interval``.
+        Run evaluation every ``eval_freq`` training episodes.
     n_eval_episodes : int
         Number of episodes to run per evaluation environment.
     deterministic : bool
         Whether to use deterministic actions during evaluation.
+    q_val_max_samples : int
+        Maximum number of replay buffer samples used for Q-value estimation.
     verbose : int
         Verbosity level.
     """
@@ -38,6 +43,7 @@ class EvalCallback(BaseCallback):
         eval_freq: int = 10,
         n_eval_episodes: int = 10,
         deterministic: bool = True,
+        q_val_max_samples: int = 5000,
         verbose: int = 0,
     ):
         super().__init__(verbose=verbose)
@@ -45,7 +51,33 @@ class EvalCallback(BaseCallback):
         self.eval_freq = eval_freq
         self.n_eval_episodes = n_eval_episodes
         self.deterministic = deterministic
+        self.q_val_max_samples = q_val_max_samples
         self._last_eval_episode = 0
+
+    def _log_q_values(self) -> None:
+        replay_buffer = self.model.replay_buffer
+        if replay_buffer is None or replay_buffer.size() == 0:
+            return
+
+        n_samples = min(self.q_val_max_samples, replay_buffer.size())
+        data = replay_buffer.sample(n_samples)
+
+        obs = data.observations.numpy()
+        actions = data.actions.numpy()
+
+        qf_state = self.model.policy.qf_state
+        # (n_critics, n_samples, 1)
+        q_values = qf_state.apply_fn(
+            qf_state.params,
+            obs,
+            actions,
+            rngs={"dropout": jax.random.PRNGKey(0)},
+        )
+        # Min over critics → (n_samples, 1)
+        q_values = np.asarray(q_values.min(axis=0).squeeze(-1))
+
+        self.logger.record("eval/q_value_p90", float(np.percentile(q_values, 90)))
+        self.logger.record("eval/q_value_mean", float(np.mean(q_values)))
 
     def _on_step(self) -> bool:
         episode_num = self.model._episode_num  # type: ignore[attr-defined]
@@ -81,6 +113,7 @@ class EvalCallback(BaseCallback):
                     f"mean_ep_length={mean_length:.0f}"
                 )
 
+        self._log_q_values()
         self.logger.dump(step=self.num_timesteps)
         return True
 
