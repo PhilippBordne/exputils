@@ -11,14 +11,43 @@ import gymnasium as gym
 import jax
 import numpy as np
 from stable_baselines3.common.callbacks import BaseCallback
-from stable_baselines3.common.evaluation import evaluate_policy
+
+
+def evaluate_policy(model, env, n_episodes, deterministic=True, gamma=0.99):
+    """Run *n_episodes* and return per-episode undiscounted and discounted returns."""
+    episode_returns = []
+    episode_discounted_returns = []
+    episode_lengths = []
+
+    for _ in range(n_episodes):
+        obs, _ = env.reset()
+        done = False
+        ep_return = 0.0
+        ep_discounted = 0.0
+        gamma_power = 1.0
+        length = 0
+
+        while not done:
+            action, _ = model.predict(obs, deterministic=deterministic)
+            obs, reward, terminated, truncated, _ = env.step(action)
+            done = terminated or truncated
+            ep_return += float(reward)
+            ep_discounted += gamma_power * float(reward)
+            gamma_power *= gamma
+            length += 1
+
+        episode_returns.append(ep_return)
+        episode_discounted_returns.append(ep_discounted)
+        episode_lengths.append(length)
+
+    return episode_returns, episode_discounted_returns, episode_lengths
 
 
 class EvalCallback(BaseCallback):
     """Evaluate the current policy on multiple environments every *N* episodes.
 
-    Also logs the 90th-percentile of Q-values estimated on a sample from the
-    replay buffer (capped at ``q_val_max_samples`` to limit overhead).
+    Also logs Q-value statistics estimated on a sample from the replay buffer
+    (capped at ``q_val_max_samples`` to limit overhead).
 
     Parameters
     ----------
@@ -57,7 +86,9 @@ class EvalCallback(BaseCallback):
     def _eval_qf_state(self, qf_state, obs, actions):
         """Forward pass through a single critic, returns (n_samples,) Q-values."""
         q_out = qf_state.apply_fn(
-            qf_state.params, obs, actions,
+            qf_state.params,
+            obs,
+            actions,
             rngs={"dropout": jax.random.PRNGKey(0)},
         )
         q_out = np.asarray(q_out)
@@ -88,7 +119,7 @@ class EvalCallback(BaseCallback):
             q2 = self._eval_qf_state(policy.qf2_state, obs, actions)
             q_values = (q1 + q2) / 2
 
-        self.logger.record("eval/q_value_p90", float(np.percentile(q_values, 90)))
+        self.logger.record("eval/q_value_p99", float(np.percentile(q_values, 99)))
         self.logger.record("eval/q_value_mean", float(np.mean(q_values)))
 
     def _on_step(self) -> bool:
@@ -100,29 +131,27 @@ class EvalCallback(BaseCallback):
             return True
 
         self._last_eval_episode = episode_num
+        gamma = self.model.gamma
 
         for log_key, env in self.eval_envs.items():
-            episode_rewards, episode_lengths = evaluate_policy(
+            ep_returns, ep_disc_returns, ep_lengths = evaluate_policy(
                 self.model,
                 env,
-                n_eval_episodes=self.n_eval_episodes,
+                n_episodes=self.n_eval_episodes,
                 deterministic=self.deterministic,
-                return_episode_rewards=True,
-                warn=False,
+                gamma=gamma,
             )
-            mean_reward = float(np.mean(episode_rewards))
-            std_reward = float(np.std(episode_rewards))
-            mean_length = float(np.mean(episode_lengths))
 
-            self.logger.record(f"{log_key}/mean_return", mean_reward)
-            self.logger.record(f"{log_key}/std_return", std_reward)
-            self.logger.record(f"{log_key}/mean_ep_length", mean_length)
+            self.logger.record(f"{log_key}/mean_return", float(np.mean(ep_returns)))
+            self.logger.record(f"{log_key}/std_return", float(np.std(ep_returns)))
+            self.logger.record(f"{log_key}/mean_discounted_return", float(np.mean(ep_disc_returns)))
+            self.logger.record(f"{log_key}/mean_ep_length", float(np.mean(ep_lengths)))
 
             if self.verbose >= 1:
                 print(
                     f"[Eval episode {episode_num}] {log_key}: "
-                    f"mean_return={mean_reward:.2f} +/- {std_reward:.2f}, "
-                    f"mean_ep_length={mean_length:.0f}"
+                    f"mean_return={np.mean(ep_returns):.2f} +/- {np.std(ep_returns):.2f}, "
+                    f"mean_discounted_return={np.mean(ep_disc_returns):.2f}"
                 )
 
         self._log_q_values()
