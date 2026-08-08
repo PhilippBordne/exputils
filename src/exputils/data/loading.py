@@ -155,6 +155,7 @@ def load_results_dataframe(
     metrics: str | list[str] | None = None,
     keep_cols: str | list | dict | None = None,
     ignore_for_unique: list[str] | None = None,
+    time_column: str = "step",
 ) -> pd.DataFrame:
     """
     Loads the results dataframe for a given task and methods. Joining the configs with their respective results.
@@ -178,7 +179,11 @@ def load_results_dataframe(
 
     last_n : Optional[int], optional
         If provided, only keeps the last n steps from the metrics (after eval_freq filtering) by default None.
-        It will remove the "step" and "start" columns after aggregation.
+        It will remove the time column and "start" columns after aggregation.
+
+    time_column : str, optional
+        Name of the column used as the time axis (e.g. "step", "seconds", "minutes").
+        Defaults to "step".
 
     metrics : Optional[str | list[str]], optional
         If provided, only keeps the specified metrics from the metrics.csv files otherwise keeps all metrics.
@@ -207,24 +212,25 @@ def load_results_dataframe(
                 continue
 
             if eval_freq is not None:
-                metrics_df = metrics_df[metrics_df["step"] % eval_freq == 0].reset_index(drop=True)
+                metrics_df = metrics_df[metrics_df[time_column] % eval_freq == 0].reset_index(drop=True)
 
             if last_n is not None:
                 metrics_df = metrics_df.tail(last_n).reset_index(drop=True)
                 metrics_df = metrics_df.agg("mean", axis="index").to_frame().T
-                metrics_df.drop(columns=["step", "start"], inplace=True, errors="ignore")
+                metrics_df.drop(columns=[time_column, "start"], inplace=True, errors="ignore")
 
             if metrics is not None:
                 if not isinstance(metrics, list):
                     metrics = [metrics]
                 metrics_df.drop(
-                    columns=[col for col in metrics_df.columns if col not in metrics and col not in ["step", "start"]],
+                    columns=[col for col in metrics_df.columns if col not in metrics and col not in [time_column, "start"]],
                     inplace=True,
                     errors="ignore",
                 )
 
             # prefix metric columns with "m." to distinguish from config columns
-            metrics_df = metrics_df.rename(columns={c: f"m.{c}" for c in metrics_df.columns if c not in ["step", "start"]})
+            if not metrics:
+                metrics_df = metrics_df.rename(columns={c: f"m.{c}" for c in metrics_df.columns if c not in [time_column, "start"]})
 
             # repeat config for each metrics row
             config_data = config_row.to_dict()
