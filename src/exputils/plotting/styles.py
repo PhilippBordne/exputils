@@ -1,0 +1,41 @@
+# You can pass this dictionary to sns.set_theme(context="paper", style="whitegrid", rc=...)
+
+STYLE_TEMPLATE = "seaborn-v0_8-darkgrid"
+
+FONTSIZES = {
+    "figure.figsize": (5.5, 1.5),
+    "figure.dpi": 600,
+    "axes.titleweight": "bold",
+    # "axes.titleweight": "normal",
+    "axes.labelweight": "normal",
+    "text.usetex": True,
+    "font.family": "lmodern",
+    "mathtext.fontset": "cm",
+    # "text.usetex": True,
+    # "font.family": "cmr10",
+    "axes.formatter.use_mathtext": True,
+    "figure.titlesize": 8,
+    "figure.titleweight": "bold",
+    "axes.titlesize": 7,
+    "axes.titlepad": 2,
+    "font.size": 6,
+    "xtick.labelsize": 5,
+    "ytick.labelsize": 5,
+    "legend.fontsize": 6,
+    "legend.title_fontsize": 6,
+    "axes.labelpad": 0.1,
+    "axes.labelsize": 6,
+    "ytick.major.width": 0.3,
+    "ytick.minor.size": 0.5,
+    "ytick.major.pad": 2,
+    "xtick.major.pad": 2,
+    # "axes.formatter.limits": (-2, 3),
+    # "axes.linewidth": 0.5,
+    "lines.linewidth": 0.5,
+    "lines.markersize": 2,
+    # set the grid style
+    "grid.linestyle": "--",
+    "grid.linewidth": 0.3,
+    "grid.color": "black",
+    "grid.alpha": 0.3,
+}
