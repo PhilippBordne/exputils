@@ -54,6 +54,19 @@ class EvalCallback(BaseCallback):
         self.q_val_max_samples = q_val_max_samples
         self._last_eval_episode = 0
 
+    def _eval_qf_state(self, qf_state, obs, actions):
+        """Forward pass through a single critic, returns (n_samples,) Q-values."""
+        q_out = qf_state.apply_fn(
+            qf_state.params, obs, actions,
+            rngs={"dropout": jax.random.PRNGKey(0)},
+        )
+        q_out = np.asarray(q_out)
+        if q_out.ndim == 3:
+            # VectorCritic: (n_critics, n_samples, 1) → min over critics
+            return q_out.min(axis=0).squeeze(-1)
+        # TQC-style single critic: (n_samples, n_quantiles) → mean over quantiles
+        return q_out.mean(axis=-1)
+
     def _log_q_values(self) -> None:
         replay_buffer = self.model.replay_buffer
         if replay_buffer is None or replay_buffer.size() == 0:
@@ -65,16 +78,15 @@ class EvalCallback(BaseCallback):
         obs = data.observations.numpy()
         actions = data.actions.numpy()
 
-        qf_state = self.model.policy.qf_state
-        # (n_critics, n_samples, 1)
-        q_values = qf_state.apply_fn(
-            qf_state.params,
-            obs,
-            actions,
-            rngs={"dropout": jax.random.PRNGKey(0)},
-        )
-        # Min over critics → (n_samples, 1)
-        q_values = np.asarray(q_values.min(axis=0).squeeze(-1))
+        policy = self.model.policy
+        if hasattr(policy, "qf_state"):
+            # SAC, TD3, CrossQ, DroQ, DDPG: single VectorCritic
+            q_values = self._eval_qf_state(policy.qf_state, obs, actions)
+        else:
+            # TQC: two separate critics, mean matches the policy gradient estimate
+            q1 = self._eval_qf_state(policy.qf1_state, obs, actions)
+            q2 = self._eval_qf_state(policy.qf2_state, obs, actions)
+            q_values = (q1 + q2) / 2
 
         self.logger.record("eval/q_value_p90", float(np.percentile(q_values, 90)))
         self.logger.record("eval/q_value_mean", float(np.mean(q_values)))
