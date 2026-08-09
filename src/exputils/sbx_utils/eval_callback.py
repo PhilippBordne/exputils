@@ -155,13 +155,19 @@ class EvalCallback(BaseCallback):
                 )
 
         self._log_q_values()
-        self.logger.dump(step=self.num_timesteps)
 
     def _on_step(self) -> bool:
         if not self._is_off_policy:
-            return True  # On-policy evaluates in _on_rollout_end
+            return True
 
-        episode_num = self.model._episode_num  # type: ignore[attr-defined]
+        # Off-policy: eval must run before dump_logs() which fires after
+        # _episode_num is incremented.  At this point _episode_num has not
+        # been updated yet, so we anticipate by checking dones.
+        dones = self.locals.get("dones", np.array([False]))
+        if not np.any(dones):
+            return True
+
+        episode_num = self.model._episode_num + int(np.sum(dones))  # type: ignore[attr-defined]
 
         if episode_num == self._last_eval_episode:
             return True
@@ -176,11 +182,14 @@ class EvalCallback(BaseCallback):
         if self._is_off_policy:
             return  # Off-policy evaluates in _on_step
 
+        # On-policy: on_rollout_end fires before dump_logs() in learn()
         self._rollout_count += 1
         if self._rollout_count % self.eval_freq != 0:
             return
+
         self._run_eval()
 
     def _on_training_end(self) -> None:
+        self._run_eval()
         for env in self.eval_envs.values():
             env.close()
