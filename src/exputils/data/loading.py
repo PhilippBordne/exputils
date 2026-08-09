@@ -87,6 +87,7 @@ def load_experiment_configs(
     keep_undone: bool = False,
     keep_cols: str | list | dict | None = None,
     ignore_for_unique: list[str] | None = None,
+    keep_path: bool = True,
 ) -> pd.DataFrame:
     """
     Load experiment configurations into a dataframe.
@@ -128,6 +129,8 @@ def load_experiment_configs(
         keep_cols = _expand_col_spec(keep_cols)
         keep_cols += ["run_id"]
 
+        if keep_path:
+            keep_cols += ["path"]
         if keep_undone:
             keep_cols += ["done"]
 
@@ -191,13 +194,14 @@ def load_results_dataframe(
     ignore_for_unique : Optional[list[str]], optional
         Columns in keep_cols to exclude from the uniqueness check. Defaults to ["run_id"].
     """
-    keep_cols = _expand_col_spec(keep_cols) if keep_cols is not None else []
+    keep_cols = _expand_col_spec(keep_cols) if keep_cols is not None else None
     config_df = load_experiment_configs(
         roots=root,
         filter=filter,
         keep_undone=keep_undone,
-        keep_cols=keep_cols + ["path"],
+        keep_cols=keep_cols,
         ignore_for_unique=ignore_for_unique,
+        keep_path=True,
     )
     results = []
 
@@ -241,7 +245,7 @@ def load_results_dataframe(
             logger.warning(f"metrics.csv not found for {config_row['path']}")
 
     df = pd.DataFrame(results)
-    if "path" not in keep_cols:
+    if keep_cols and "path" not in keep_cols:
         df.drop(columns=["path"], inplace=True, errors="ignore")
 
     # drop not needed columns
