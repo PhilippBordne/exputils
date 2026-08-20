@@ -4,7 +4,6 @@ from typing import Literal
 import pandas as pd
 
 
-
 @dataclass
 class LatexTable:
     # tuples of (column name, number of value columns to span), per column level
@@ -92,7 +91,7 @@ def _populate_latex_table_from_df(
     df_upper: pd.DataFrame | None = None,
     df_std: pd.DataFrame | None = None,
     df_p_values: pd.DataFrame | None = None,
-    highlight_best: Literal["min", "max", None] = None,
+    highlight_best: Literal["min", "max"] | None = None,
     split_column_level: int | None = None,
     decimal_precision: int = 0,
 ) -> LatexTable:
@@ -217,7 +216,8 @@ def latex_table_to_string(
     live_col_level_names = table.column_level_names or [str(n) for n in df.columns.names]
 
     header_rows = _build_header_rows(
-        table, vline_positions,
+        table,
+        vline_positions,
         column_label_fontsize=column_label_fontsize,
         row_header=row_header,
         column_level_names=live_col_level_names,
@@ -301,7 +301,7 @@ def latex_table_to_string(
             if has_pval:
                 p_val = table.df_p_values.loc[row_label, col_label]  # type: ignore[union-attr]
                 pprec = p_value_precision
-                if p_value_threshold is not None and float(p_val) < p_value_threshold:
+                if p_value_threshold is not None and float(p_val) < p_value_threshold:  # type: ignore[union-attr]
                     p_annotation = f"p<{p_value_threshold:.{pprec}f}"
                 else:
                     p_annotation = f"p={p_val:.{pprec}f}"
@@ -369,8 +369,12 @@ def _build_header_rows(
                 col_level_label = column_level_names[last_idx] if column_level_names and last_idx < len(column_level_names) else ""
                 if col_level_label:
                     span_cell = _sized(f"\\multicolumn{{{n_data_cols}}}{{c}}{{\\textbf{{{col_level_label}}}}}")
-                    rows.append(" & ".join(["", span_cell]))
-                rows.append(_build_header_row(level_headers, vline_positions, centered=True, descriptor=row_header, descriptor_is_header=True, fontsize=fontsize))
+                    rows.append(f" & {span_cell}")
+                rows.append(
+                    _build_header_row(
+                        level_headers, vline_positions, centered=True, descriptor=row_header, descriptor_is_header=True, fontsize=fontsize
+                    )
+                )
             else:
                 descriptor = column_level_names[level_idx] if column_level_names and level_idx < len(column_level_names) else None
                 rows.append(_build_header_row(level_headers, vline_positions, centered=True, descriptor=descriptor, fontsize=fontsize))
@@ -389,8 +393,10 @@ def _build_header_rows(
         # leaving the leftmost (row-label) cell empty.
         col_level_label = column_level_names[0] if column_level_names else ""
         span_cell = _sized(f"\\multicolumn{{{n_data_cols}}}{{c}}{{\\textbf{{{col_level_label}}}}}")
-        top_row = " & ".join(["", span_cell])
-        col_names_row = _build_header_row(items, vline_positions, centered=True, descriptor=row_header, descriptor_is_header=True, fontsize=fontsize)
+        top_row = f" & {span_cell}"
+        col_names_row = _build_header_row(
+            items, vline_positions, centered=True, descriptor=row_header, descriptor_is_header=True, fontsize=fontsize
+        )
         return [top_row, col_names_row]
 
     # No row_header: use column level name as the sole descriptor

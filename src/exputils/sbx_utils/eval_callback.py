@@ -104,11 +104,11 @@ class EvalCallback(BaseCallback):
         return hasattr(self.model, "replay_buffer")
 
     def _log_q_values(self) -> None:
-        if not self._is_off_policy:
+        replay_buffer = getattr(self.model, "replay_buffer", None)
+        if replay_buffer is None:
             return
 
-        replay_buffer = self.model.replay_buffer
-        if replay_buffer is None or replay_buffer.size() == 0:
+        if replay_buffer.size() == 0:
             return
 
         n_samples = min(self.q_val_max_samples, replay_buffer.size())
@@ -131,7 +131,8 @@ class EvalCallback(BaseCallback):
         self.logger.record("eval/q_value_mean", float(np.mean(q_values)))
 
     def _run_eval(self) -> None:
-        gamma = self.model.gamma
+        gamma = getattr(self.model, "gamma", None)
+        assert gamma is not None, "Model must have a `gamma` attribute for discounted return evaluation."
 
         for log_key, env in self.eval_envs.items():
             ep_returns, ep_disc_returns, ep_lengths = evaluate_policy(
@@ -178,16 +179,25 @@ class EvalCallback(BaseCallback):
         self._run_eval()
         return True
 
-    def _on_rollout_end(self) -> None:
+    def _on_rollout_start(self) -> None:
         if self._is_off_policy:
-            return  # Off-policy evaluates in _on_step
+            return
 
-        # On-policy: on_rollout_end fires before dump_logs() in learn()
-        self._rollout_count += 1
+        # On-policy: on_rollout_start fires after the previous iteration's
+        # train(), so we evaluate the updated policy.  The recorded metrics
+        # are flushed by this iteration's dump_logs().
+        if self._rollout_count == 0:
+            return  # no training has happened yet
         if self._rollout_count % self.eval_freq != 0:
             return
 
         self._run_eval()
+
+    def _on_rollout_end(self) -> None:
+        if self._is_off_policy:
+            return
+
+        self._rollout_count += 1
 
     def _on_training_end(self) -> None:
         self._run_eval()

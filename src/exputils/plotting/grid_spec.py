@@ -1,7 +1,10 @@
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any, Mapping, Sequence, Optional, Literal
+from typing import Any, Literal, Optional
 
-from core.plotting.utils import get_colors_for_values
+from matplotlib import pyplot as plt
+
+from exputils.plotting.utils import get_colors_for_values
 
 
 @dataclass
@@ -17,7 +20,7 @@ class GridSpec:
 
     key: str
     values: Sequence[Any]
-    labels: Optional[Sequence[str]] = None
+    labels: Sequence[str] | None = None
 
     def label(self, i: int) -> str:
         if self.labels is not None:
@@ -42,11 +45,15 @@ class HueSpec(GridSpec):
                    axis falls back to a numeric colormap (see `cmap_name`).
     """
 
-    colors: Optional[Sequence[Any] | Mapping[Any, Any]] = None
-    linestyles: Optional[Sequence[Literal["-", "--", "-.", ":"]]] = None
-    markerstyles: Optional[Sequence[Literal["o", "x", "v"]]] = None
+    colors: Mapping[Any, Any] | None = None
+    linestyles: Sequence[Literal["-", "--", "-.", ":"]] | None = None
+    markerstyles: Sequence[Literal["o", "x", "v"]] | None = None
 
-    def color(self, i: int) -> Optional[Any]:
+    def __post_init__(self):
+        if self.colors is None:
+            self.colors = {k: c for k, c in zip(self.values, plt.get_cmap("tab10").colors)}  # type: ignore
+
+    def color(self, i: int) -> Any | None:
         if self.colors is None:
             return None
         if isinstance(self.colors, Mapping):

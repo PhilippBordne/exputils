@@ -31,8 +31,8 @@ import pandas as pd
 from matplotlib.figure import Figure
 
 from exputils.data.loading import filter_df_by_dict
-from core.plotting.grid_spec import GridSpec, HueSpec
-from core.plotting.utils import create_global_legend
+from exputils.plotting.grid_spec import GridSpec, HueSpec
+from exputils.plotting.utils import create_global_legend
 
 
 def plot_barplot_grid(
@@ -134,7 +134,7 @@ def plot_barplot_grid(
 
     for i, row_val in enumerate(_row_values):
         for j, col_val in enumerate(_col_values):
-            ax: plt.Axes = axes[i, j]
+            ax: plt.Axes = axes[i, j]  # type: ignore[assignment]
 
             for idx, (colour, hue_val) in enumerate(zip(colours, hue.values)):
                 flt = {**fixed, hue.key: hue_val}

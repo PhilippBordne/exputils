@@ -35,8 +35,8 @@ from matplotlib.figure import Figure
 from scipy.optimize import minimize
 
 from exputils.data.loading import filter_df_by_dict
-from core.plotting.grid_spec import GridSpec, HueSpec
-from core.plotting.utils import create_global_legend
+from exputils.plotting.grid_spec import GridSpec, HueSpec
+from exputils.plotting.utils import create_global_legend
 
 
 def _fit_line(x: np.ndarray, y: np.ndarray, loss: Literal["l1", "l2"]) -> tuple[float, float]:
@@ -143,7 +143,7 @@ def plot_scatterplot_grid(
 
     for i, row_val in enumerate(_row_values):
         for j, col_val in enumerate(_col_values):
-            ax: plt.Axes = axes[i, j]
+            ax: plt.Axes = axes[i, j]  # type: ignore[assignment]
             all_x: list[np.ndarray] = []
             all_y: list[np.ndarray] = []
             for colour, marker, hue_val in zip(colours, markers, hue.values):
@@ -177,7 +177,7 @@ def plot_scatterplot_grid(
                     x_line = np.array([x.min(), x.max()])
                     ax.plot(
                         x_line,
-                        slope * x_line + intercept,
+                        slope * x_line + intercept,  # type: ignore[operator]
                         color=colour,
                         linewidth=marker_size / 4,
                         label=f"{regression_loss.capitalize()} regression",

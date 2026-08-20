@@ -1,7 +1,10 @@
 import logging
-from matplotlib.figure import Figure
-from typing import Optional, Literal, Callable
+from collections.abc import Callable
+from typing import Literal, Optional
+
 import pandas as pd
+from matplotlib.colors import Normalize
+from matplotlib.figure import Figure
 from pandas.core.groupby import DataFrameGroupBy
 
 
@@ -9,11 +12,11 @@ def create_global_legend(
     fig: Figure,
     placement: Literal["below", "right"] = "below",
     spacing: float = 0.02,
-    ncol: Optional[int] = None,
-    title: Optional[str] = None,
-    columnspacing: Optional[float] = None,
-    handletextpad: Optional[float] = None,
-    handlelength: Optional[float] = None,
+    ncol: int | None = None,
+    title: str | None = None,
+    columnspacing: float | None = None,
+    handletextpad: float | None = None,
+    handlelength: float | None = None,
 ) -> None:
     """
     Collects all legend handles and labels from all axes/subplots in the figure and creates a single legend.
@@ -148,12 +151,12 @@ def mean_std_by_learn_and_task(
 def get_colors_for_values(
     values: list[float] | list[int], cmap_name: str = "viridis", log: bool = False
 ) -> list[tuple[float, float, float, float]]:
-    from matplotlib.colors import LogNorm
     import matplotlib.pyplot as plt
+    from matplotlib.colors import LogNorm
 
     cmap = plt.get_cmap(cmap_name)
     if log:
         norm = LogNorm(min(values), max(values))
     else:
-        norm = plt.Normalize(min(values), max(values))
+        norm = Normalize(min(values), max(values))
     return [cmap(norm(value)) for value in values]
