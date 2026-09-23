@@ -29,8 +29,7 @@ from matplotlib.colors import Normalize
 from matplotlib.figure import Figure
 
 from exputils.data.loading import filter_df_by_dict
-from core.plotting.grid_spec import ColumnSpec, GridSpec
-from core.plotting.utils import create_global_x_label
+from exputils.plotting.grid_spec import GridSpec
 
 CmapShare = Literal["none", "group", "row", "col"]
 
@@ -39,7 +38,7 @@ def plot_pcolor_grid(
     data: pd.DataFrame,
     *,
     row: GridSpec | None = None,
-    col: ColumnSpec | None = None,
+    col: GridSpec | None = None,
     x_dim: str,
     y_dim: str,
     fixed: dict | None = None,
@@ -178,6 +177,7 @@ def plot_pcolor_grid(
 
     if center_cmap:
         for norm in norms.values():
+            assert norm.vmin and norm.vmax
             max_abs = max(abs(norm.vmin), abs(norm.vmax))
             norm.vmin = -max_abs
             norm.vmax = max_abs
@@ -186,7 +186,7 @@ def plot_pcolor_grid(
     meshes: dict[tuple[int, int], Any] = {}
     for i in range(n_rows):
         for j in range(n_cols):
-            ax: plt.Axes = axes[i, j]
+            ax: plt.Axes = axes[i, j]  # type: ignore[assignment]
             x_vals, y_vals, Z = cell_data[i][j]
 
             if Z is None or x_vals is None or y_vals is None:
@@ -213,10 +213,8 @@ def plot_pcolor_grid(
             axes[i, 0].set_ylabel(row.label(i))
     if col_title and col is not None:
         for j in range(n_cols):
-            axes[0, j].set_title(col.title(j))
+            axes[0, j].set_title(col.label(j))
 
-    if x_label is not None:
-        create_global_x_label(fig, x_label, y=x_label_y)
     if y_label is not None:
         fig.supylabel(y_label, x=y_label_x)
 
