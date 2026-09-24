@@ -54,6 +54,7 @@ def plot_barplot_grid(
     dash_width_fraction: float = 1.0,
     cmap_name: str = "viridis",
     val_lims: tuple[float | None, float | None] | None = None,
+    val_margin: float = 0.05,
     col_title: bool = True,
     row_ylabel: bool = True,
     x_label: str | None = None,
@@ -80,7 +81,9 @@ def plot_barplot_grid(
     of orientation: for horizontal bars it is passed as ``sharex`` to
     :func:`plt.subplots`; for vertical bars it is passed as ``sharey``.
 
-    ``x_lims`` applies to the **value axis** in both orientations.
+    ``val_lims`` applies to the **value axis** in both orientations; where a
+    bound is ``None`` the data extent padded by ``val_margin`` (a fraction of
+    the data span) is used instead.
 
     Interval bounds are resolved in priority order:
       1. ``low_col`` / ``high_col`` (asymmetric intervals, both required)
@@ -132,6 +135,10 @@ def plot_barplot_grid(
 
     dash_half = bar_height * dash_width_fraction / 2
 
+    # Track data extent per cell for val_margin padding
+    val_min = np.full((n_rows, n_cols), np.inf)
+    val_max = np.full((n_rows, n_cols), -np.inf)
+
     for i, row_val in enumerate(_row_values):
         for j, col_val in enumerate(_col_values):
             ax: plt.Axes = axes[i, j]  # type: ignore[assignment]
@@ -176,6 +183,13 @@ def plot_barplot_grid(
                         ax.bar(pos, height=high - low, bottom=low, width=bar_height, color=colour, alpha=0.4, label=label)  # type: ignore[arg-type]
                     ax.hlines(point, pos - dash_half, pos + dash_half, **dash_kwargs)
 
+                if has_interval:
+                    val_min[i, j] = min(val_min[i, j], low)
+                    val_max[i, j] = max(val_max[i, j], high)
+                else:
+                    val_min[i, j] = min(val_min[i, j], point)
+                    val_max[i, j] = max(val_max[i, j], point)
+
             # hue_tick_labels = [hue.label(n_hue - 1 - k) for k in range(n_hue)]
             hue_tick_labels = [hue.label(k) for k in range(n_hue)]
             rotation = rotate_ticks
@@ -186,14 +200,27 @@ def plot_barplot_grid(
                 ax.set_yticks(list(range(n_hue)))
                 ax.set_yticklabels(hue_tick_labels, rotation=rotation)
                 ax.set_ylim(-0.5, n_hue - 0.5)
-                if val_lims is not None:
-                    ax.set_xlim(*val_lims)
             else:
                 ax.set_xticks(list(range(n_hue)))
                 ax.set_xticklabels(hue_tick_labels, rotation=rotation)
                 ax.set_xlim(-0.5, n_hue - 0.5)
-                if val_lims is not None:
-                    ax.set_ylim(*val_lims)
+
+    # Apply value axis limits with margin from tracked data extent
+    global_vmin = np.min(val_min[np.isfinite(val_min)]) if np.any(np.isfinite(val_min)) else 0
+    global_vmax = np.max(val_max[np.isfinite(val_max)]) if np.any(np.isfinite(val_max)) else 1
+    pad = (global_vmax - global_vmin) * val_margin
+    padded_lo = global_vmin - pad
+    padded_hi = global_vmax + pad
+    if val_lims is not None:
+        if val_lims[0] is not None:
+            padded_lo = val_lims[0]
+        if val_lims[1] is not None:
+            padded_hi = val_lims[1]
+    # Set once on first axis per shared group (shared axes propagate automatically)
+    if is_horiz:
+        axes[0, 0].set_xlim(padded_lo, padded_hi)
+    else:
+        axes[0, 0].set_ylim(padded_lo, padded_hi)
 
     if col_title and col is not None:
         for j in range(n_cols):
