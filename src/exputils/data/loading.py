@@ -9,6 +9,8 @@ from exputils.run.info import RunInfo
 
 logger = logging.getLogger(__name__)
 
+StrPath = str | os.PathLike[str]
+
 
 def filter_df_by_dict(df: pd.DataFrame, filter: dict | list[dict]) -> pd.DataFrame:
     if isinstance(filter, dict):
@@ -52,8 +54,8 @@ def _expand_col_spec(spec: str | list | dict, prefix: str = "") -> list[str]:
     raise TypeError(f"Unsupported type in col spec: {type(spec)}")
 
 
-def _load_configs_under_root(roots: str | list[str], keep_undone: bool = False) -> pd.DataFrame:
-    if isinstance(roots, str):
+def _load_configs_under_root(roots: StrPath | list[StrPath], keep_undone: bool = False) -> pd.DataFrame:
+    if isinstance(roots, (str, os.PathLike)):
         roots = [roots]
 
     rows = []
@@ -82,7 +84,7 @@ def _load_configs_under_root(roots: str | list[str], keep_undone: bool = False) 
 
 
 def load_experiment_configs(
-    roots: str | list[str],
+    roots: StrPath | list[StrPath],
     filter: dict | list[dict] | None = None,
     keep_undone: bool = False,
     keep_cols: str | list | dict | None = None,
@@ -150,7 +152,7 @@ def load_experiment_configs(
 
 
 def load_results_dataframe(
-    root: str | list[str],
+    root: StrPath | list[StrPath],
     filter: dict | list[dict] | None = None,
     keep_undone: bool = False,
     eval_freq: int | None = None,
