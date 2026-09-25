@@ -16,8 +16,10 @@ log_to_wandb: false
 # --- Seed ---
 # Local / single task:
 seed: 0
-# Multi-task SLURM (ntasks > 1), each task gets seed = base + SLURM_PROCID:
-# seed: ${slurm_seed:0}
+# Multi-task SLURM (ntasks > 1), each task gets seed = base_seed + SLURM_PROCID.
+# Sweep base_seed, not seed: base_seed=0,3 with ntasks=3 gives seeds 0-5, whereas a plain
+# seed=0,3 replaces the resolver and runs ntasks identical copies in the same directory.
+# seed: ${slurm_seed:${base_seed}}
 
 # --- Results path ---
 # Local:

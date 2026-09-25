@@ -25,14 +25,33 @@ produce the same directory, and the experiment detects existing state and resume
 ### Identity comparison
 
 `FullConfig.identical_to()` compares configs ignoring fields in `_identity_exclude`
-(run_id, run_name, log_to_wandb, num_workers, path_results). Override
-`_identity_exclude` in subclasses to exclude additional infrastructure fields.
+(run_id, run_name, log_to_wandb, path_results, base_seed). Override
+`_identity_exclude` in subclasses to exclude additional infrastructure fields, e.g.
+`_identity_exclude = FullConfig._identity_exclude | {"num_workers"}`.
 
-### SLURM seed offset
+### Seeds: `seed` and `base_seed`
 
-When launching with `ntasks > 1`, each task gets `SLURM_PROCID` (0, 1, 2, ...).
-The `slurm_seed` resolver adds this to the base seed, ensuring each task gets a
-unique seed AND a unique directory (since `${seed}` is in the path).
+`seed` is the seed a run trains with. It appears in the run directory and in the saved
+`config.yaml`, so it is what identifies a run.
+
+On SLURM, a job with `ntasks > 1` runs `ntasks` copies of the same command, and each copy
+gets its own `SLURM_PROCID` (0, 1, 2, ...). The cluster configs therefore set
+
+```yaml
+seed: ${slurm_seed:${base_seed}}   # = base_seed + SLURM_PROCID
+```
+
+so each task trains its own seed in its own directory. `base_seed` is a `FullConfig` field
+(default 0) that only exists to feed this resolver. It is excluded from the run identity
+because the resolved `seed` already covers it.
+
+- **Local runs**: set `seed` directly (`seed: 0` in `run.yaml`). `base_seed` has no effect.
+- **SLURM runs**: sweep `base_seed`, not `seed`. With `ntasks=3`, `base_seed=0,3` gives
+  seeds 0-5.
+- Overriding `seed` with a plain value (`seed=0,3`) replaces the resolver, so all tasks of a
+  job train the same seed in the same directory. The entry point below refuses to start
+  such a job.
+- To reproduce a single SLURM task locally, pass its resolved seed: `seed=4`.
 
 ## Entry Point with Resolvers
 
@@ -46,7 +65,7 @@ import os
 from typing import cast
 
 import hydra
-from omegaconf import OmegaConf
+from omegaconf import DictConfig, OmegaConf
 
 from exputils.config.loading import load_config_from_yaml
 from exputils.run.info import RunInfo, get_slurm_id, is_job_running
@@ -55,14 +74,16 @@ from my_project.configuration import MyConfig
 
 # --- Register OmegaConf resolvers ---
 
-# Seed with SLURM task offset: ${slurm_seed:0} resolves to 0 + SLURM_PROCID.
-# Use in cluster configs to give each SLURM task a unique seed.
-# Locally (no SLURM_PROCID), it's a no-op.
-# NOTE THIS ONLY WORKS IF THE RESOLVER RUNS PER TASK (i.e. if launched by batch script / does not work if done through hydra's submitit)
+# Seed with SLURM task offset: ${slurm_seed:${base_seed}} resolves to base_seed + SLURM_PROCID.
+# Locally (no SLURM_PROCID), it returns base_seed unchanged.
+# This also works with hydra's submitit launcher, which recomposes the config on the compute
+# node, but only with use_cache=False: the launcher resolves hydra.sweep.dir (which ends in
+# ${seed}) on the login node, where SLURM_PROCID is unset. A cached 0 would be pickled into the
+# master config and copied into every task's config, giving all tasks the same seed and directory.
 OmegaConf.register_new_resolver(
     "slurm_seed",
-    lambda base: int(base) + int(os.environ.get("SLURM_PROCID", 0)),
-    use_cache=True,
+    lambda base: int(base) + int(os.environ.get("SLURM_PROCID", "0")),
+    use_cache=False,
 )
 
 # Run name from config fields: ${gen_run_name:${field_a},${field_b}}
@@ -75,7 +96,18 @@ OmegaConf.register_new_resolver("gen_run_name", _gen_run_name, use_cache=True)
 
 
 @hydra.main(config_path="config", config_name="my_config", version_base=None)
-def main(cfg: OmegaConf) -> None:
+def main(cfg: DictConfig) -> None:
+    # --- Seed guard ---
+    # All tasks of a job run the same command, so without slurm_seed they would train the same
+    # seed and write into the same run directory concurrently. to_container leaves
+    # interpolations unresolved, so the raw seed expression is visible here.
+    raw_cfg = cast(dict, OmegaConf.to_container(cfg))
+    if int(os.environ.get("SLURM_NTASKS", "1")) > 1 and "slurm_seed" not in str(raw_cfg["seed"]):
+        raise ValueError(
+            f"Job runs {os.environ['SLURM_NTASKS']} tasks but seed={cfg.seed} does not use the "
+            "slurm_seed resolver. Sweep base_seed instead of seed."
+        )
+
     config = cast(MyConfig, OmegaConf.to_object(cfg))
 
     # --- Resume detection ---
@@ -114,22 +146,9 @@ if __name__ == "__main__":
 
 
 ## Domain Config Example
-Inherit from `FullConfig` to set all parameters that are expected by the util functions of this repository and the example config files.
-
-```python
-@dataclass
-class FullConfig:
-    group: str | None = field(default=None)
-    log_to_wandb: bool = field(default=False)
-    seed: int = field(default=42)
-    run_id: str | None = field(default=None)
-    run_name: str | None = field(default=None)
-    path_results: str = field(default="results")
-    num_workers: int = field(default=1)
-
-    # Fields that are excluded from identical_to comparison (infrastructure, not experiment definition)
-    _identity_exclude = frozenset({"run_id", "run_name", "log_to_wandb", "num_workers", "path_results"})
-```
+Inherit from `FullConfig` (see `config/template.py`) to get every field that the util functions
+of this repository and the example config files expect: `seed`, `base_seed`, `log_to_wandb`,
+`wandb_project`, `run_id`, `run_name`, `group` and `path_results`.
 
 ```python
 # src/my_project/configuration.py

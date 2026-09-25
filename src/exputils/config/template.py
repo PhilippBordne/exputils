@@ -17,6 +17,9 @@ class FullConfig:
 
     # always required
     seed: int = field(default=42)
+    # first seed of a multi-task SLURM job: cluster configs set seed to ${slurm_seed:${base_seed}},
+    # i.e. base_seed + SLURM_PROCID. Unused otherwise, and not part of the run identity since seed is.
+    base_seed: int = field(default=0)
 
     # required to use the wandb run setup
     log_to_wandb: bool = field(default=False)
@@ -29,7 +32,7 @@ class FullConfig:
     path_results: str = field(default="results")
 
     # Fields that are excluded from identical_to comparison (infrastructure, not experiment definition)
-    _identity_exclude = frozenset({"run_id", "run_name", "log_to_wandb", "path_results"})
+    _identity_exclude = frozenset({"run_id", "run_name", "log_to_wandb", "path_results", "base_seed"})
 
     def identical_to(self, other: "FullConfig") -> bool:
         """Check whether this configuration is identical to another, ignoring run metadata."""

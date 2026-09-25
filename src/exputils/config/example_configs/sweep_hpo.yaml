@@ -13,19 +13,23 @@ defaults:
 
 wandb_project: a_random_project
 group: hpo_example
-seed: ${slurm_seed:0}
+# one seed per SLURM task: base_seed + SLURM_PROCID (see run.yaml). Sweep base_seed, not seed.
+seed: ${slurm_seed:${base_seed}}
 log_to_wandb: false
 path_results: /work/my_cluster_path/results
 
 hydra:
   sweep:
     dir: ${path_results}/${group}/${run_name}/${hydra.job.override_dirname}/${seed}
+    # the default ${hydra.job.num} would append a job-index level and break resuming
+    subdir: .
   job:
     config:
       override_dirname:
         exclude_keys:
           - group
           - seed
+          - base_seed
           - log_to_wandb
           - path_results
 

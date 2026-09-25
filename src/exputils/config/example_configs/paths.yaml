@@ -11,3 +11,5 @@ hydra:
     dir: ${path_results}/${group}/${run_name}/lr:${train.lr}/${seed}
   sweep:
     dir: ${path_results}/${group}/${run_name}/lr:${train.lr}/${seed}
+    # the default ${hydra.job.num} would append a job-index level and break resuming
+    subdir: .
