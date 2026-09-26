@@ -1,21 +1,35 @@
+import logging
 import os
 import secrets
 import string
 import subprocess
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
+from pathlib import Path
 from typing import Literal
 
 import git
 import yaml
 
+logger = logging.getLogger(__name__)
 
-def get_commit_hash():
+
+def get_commit_hash(path: str | Path) -> str | None:
+    """Return the HEAD commit of the git repo containing ``path``, suffixed with ``-dirty`` if
+    tracked files have uncommitted changes, or None if ``path`` is not inside a git repo.
+
+    Pass a path inside the code's repo (e.g. ``Path(__file__).parent``), not the cwd: runs may
+    execute in a results directory outside the repo.
     """
-    Helper function that can get commit hash upon data class instantiation
-    """
-    repo = git.Repo(search_parent_directories=True)
-    return repo.head.object.hexsha
+    try:
+        repo = git.Repo(path, search_parent_directories=True)
+    except (git.InvalidGitRepositoryError, git.NoSuchPathError):
+        logger.warning(f"{path} is not inside a git repository, commit hash is not recorded")
+        return None
+    commit_hash = repo.head.object.hexsha
+    if repo.is_dirty(untracked_files=False):
+        commit_hash += "-dirty"
+    return commit_hash
 
 
 def get_slurm_id() -> str | None:
@@ -60,7 +74,7 @@ ExperimentStatus = Literal["running", "done", "preempted"]
 class RunInfo:
     """Dataclass to store metadata about the experiment run."""
 
-    commit_hash: str = field(default_factory=get_commit_hash)
+    commit_hash: str | None = field(default=None)
     run_id: str = field(default="")
     status: ExperimentStatus = field(default="running")
     slurm_id: str | None = field(default_factory=get_slurm_id)
